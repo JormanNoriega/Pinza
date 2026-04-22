@@ -53,7 +53,6 @@ export class PliersScene {
         this.axesVisible = true;
         this.motion = {
             currentAngle: 0,
-            velocity: 0,
             targetAngle: 0,
         };
         this.currentInputs = null;
@@ -73,7 +72,7 @@ export class PliersScene {
         this.renderer.outputColorSpace = THREE.SRGBColorSpace;
 
         this.controls = new OrbitControls(this.camera, this.renderer.domElement);
-        this.controls.enableDamping = true;
+        this.controls.enableDamping = false;
         this.controls.target.set(0.4, 0.2, 0);
         this.controls.maxDistance = 26;
         this.controls.minDistance = 6;
@@ -305,8 +304,8 @@ export class PliersScene {
         buildLever(this.lowerGeometry, this.lowerAnnotations, -1);
 
         this.updateAnnotations(inputs, {
-            actualForce: inputs.inputForce,
-            outputForce: inputs.inputForce,
+            actualForce: 0,
+            outputForce: 0,
         });
     }
 
@@ -320,14 +319,23 @@ export class PliersScene {
                 return;
             }
 
-            const inputLength = THREE.MathUtils.clamp(0.85 + forces.actualForce / 220, 0.85, 3.6);
-            const outputLength = THREE.MathUtils.clamp(0.75 + forces.outputForce / 280, 0.75, 4.8);
+            const hasInputForce = forces.actualForce > 0.01;
+            const hasOutputForce = forces.outputForce > 0.01;
 
-            inputArrow.position.set(-d1, sign * 0.72 * scale, 0);
-            inputArrow.setLength(inputLength, 0.34, 0.16);
+            inputArrow.visible = hasInputForce;
+            outputArrow.visible = hasOutputForce;
 
-            outputArrow.position.set(d2, sign * 0.18 * scale, 0);
-            outputArrow.setLength(outputLength, 0.28, 0.14);
+            if (hasInputForce) {
+                const inputLength = THREE.MathUtils.clamp(0.55 + forces.actualForce / 220, 0.55, 3.4);
+                inputArrow.position.set(-d1, sign * 1.12 * scale, 0);
+                inputArrow.setLength(inputLength, 0.24, 0.14);
+            }
+
+            if (hasOutputForce) {
+                const outputLength = THREE.MathUtils.clamp(0.6 + forces.outputForce / 280, 0.6, 4.8);
+                outputArrow.position.set(d2, sign * 0.72 * scale, 0);
+                outputArrow.setLength(outputLength, 0.24, 0.14);
+            }
         };
 
         updateArrowPair(this.upperInputArrow, this.upperOutputArrow, 1);
@@ -348,7 +356,7 @@ export class PliersScene {
     }
 
     update(simulation) {
-        const { inputs, actual, scene } = simulation;
+        const { inputs, load, actual, scene } = simulation;
         this.currentInputs = inputs;
 
         const signature = [inputs.handleLength, inputs.jawLength, inputs.visualScale].map((value) => value.toFixed(3)).join("|");
@@ -358,7 +366,7 @@ export class PliersScene {
         }
 
         this.updateAnnotations(inputs, {
-            actualForce: inputs.inputForce,
+            actualForce: load.activeInputForce,
             outputForce: actual.outputForce,
         });
 
@@ -397,14 +405,8 @@ export class PliersScene {
     }
 
     animate() {
-        const delta = Math.min(this.clock.getDelta(), 0.04);
-        const mass = this.currentInputs?.mass ?? 1.2;
-        const damping = this.currentInputs?.damping ?? 0.35;
-
-        const stiffness = 8.2 / mass;
-        this.motion.velocity += (this.motion.targetAngle - this.motion.currentAngle) * stiffness * delta;
-        this.motion.velocity *= Math.max(0, 1 - damping * 3.2 * delta);
-        this.motion.currentAngle += this.motion.velocity;
+        this.clock.getDelta();
+        this.motion.currentAngle = this.motion.targetAngle;
 
         const halfAngle = this.motion.currentAngle * 0.5;
         this.upperPivot.rotation.z = halfAngle;

@@ -75,8 +75,8 @@ export function renderForceGraph(simulation) {
 
     const verticalLines = 4;
     for (let index = 0; index <= verticalLines; index += 1) {
-        const forceValue = (graph.xMax / verticalLines) * index;
-        const x = xScale(forceValue);
+        const timeValue = (graph.xMax / verticalLines) * index;
+        const x = xScale(timeValue);
 
         gridGroup.appendChild(
             createSvgElement("line", {
@@ -96,7 +96,7 @@ export function renderForceGraph(simulation) {
             "font-size": 12,
             "text-anchor": "middle",
         });
-        label.textContent = `${Math.round(forceValue)} N`;
+        label.textContent = `${timeValue.toFixed(1)} s`;
         gridGroup.appendChild(label);
     }
 
@@ -125,8 +125,8 @@ export function renderForceGraph(simulation) {
     );
     svg.appendChild(axes);
 
-    const inputPoints = graph.samples.map((sample) => [xScale(sample.inputForce), yScale(sample.referenceForce)]);
-    const outputPoints = graph.samples.map((sample) => [xScale(sample.inputForce), yScale(sample.outputForce)]);
+    const inputPoints = graph.samples.map((sample) => [xScale(sample.time), yScale(sample.inputForce)]);
+    const outputPoints = graph.samples.map((sample) => [xScale(sample.time), yScale(sample.outputForce)]);
 
     svg.appendChild(
         createSvgElement("path", {
@@ -150,11 +150,11 @@ export function renderForceGraph(simulation) {
         }),
     );
 
-    const configuredX = xScale(graph.configuredPoint.inputForce);
+    const configuredXTime = xScale(graph.configuredPoint.time);
     const configuredY = yScale(graph.configuredPoint.outputForce);
     svg.appendChild(
         createSvgElement("circle", {
-            cx: configuredX,
+            cx: configuredXTime,
             cy: configuredY,
             r: 7,
             fill: "#ffffff",
@@ -164,7 +164,7 @@ export function renderForceGraph(simulation) {
         }),
     );
 
-    const activeX = xScale(graph.activePoint.inputForce);
+    const activeX = xScale(graph.activePoint.time);
     const activeY = yScale(graph.activePoint.outputForce);
     svg.appendChild(
         createSvgElement("circle", {
@@ -203,7 +203,7 @@ export function renderForceGraph(simulation) {
         fill: "#5d737c",
         "font-size": 12,
     });
-    topLine.textContent = `Entrada ${graph.activePoint.inputForce.toFixed(1)} N`;
+    topLine.textContent = `t=${graph.activePoint.time.toFixed(2)} s | F_in ${graph.activePoint.inputForce.toFixed(1)} N`;
 
     const bottomLine = createSvgElement("text", {
         x: labelX + 12,
@@ -224,7 +224,7 @@ export function renderForceGraph(simulation) {
         "font-size": 12,
         "text-anchor": "end",
     });
-    xAxisLabel.textContent = "Fuerza de entrada aplicada";
+    xAxisLabel.textContent = "Tiempo del evento";
     svg.appendChild(xAxisLabel);
 
     const yAxisLabel = createSvgElement("text", {

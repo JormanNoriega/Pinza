@@ -1,5 +1,6 @@
 import {
     DEFAULT_PARAMETERS,
+    DEFAULT_DURATION_SECONDS,
     PARAMETER_SECTIONS,
     calculateSimulation,
 } from "./js/model.js";
@@ -16,6 +17,7 @@ const initialState = { ...DEFAULT_PARAMETERS, ...bootstrapDefaults };
 
 const sceneContainer = document.getElementById("three-container");
 const controlsRoot = document.getElementById("controls-root");
+const durationInput = document.getElementById("force-duration-input");
 
 const controls = createControlPanel({
     container: controlsRoot,
@@ -28,15 +30,23 @@ let scene = null;
 let state = { ...initialState };
 const runtime = {
     forceProgress: 0,
-    targetForceProgress: 0,
+    elapsedSeconds: 0,
+    durationSeconds: DEFAULT_DURATION_SECONDS,
     animationFrameId: null,
+    isRunning: false,
     lastTimestamp: 0,
+    graphHistory: [],
 };
+
+syncDurationInput();
+durationInput?.addEventListener("input", handleDurationChange);
+durationInput?.addEventListener("change", handleDurationChange);
 
 setupActionButtons({
     onReset: () => {
         state = { ...DEFAULT_PARAMETERS, ...bootstrapDefaults };
-        stopForceAnimation(true);
+        resetRuntime(true);
+        syncDurationInput();
         refresh(true);
     },
     onFocus: () => scene?.focus(),
@@ -50,6 +60,7 @@ initializeScene();
 
 function handleParameterChange(key, value) {
     state = { ...state, [key]: value };
+    resetRuntime(true);
     refresh(true);
 }
 
@@ -66,53 +77,123 @@ function refresh(syncControls = false) {
     scene?.update(simulation);
 }
 
-function setForceApplied(isApplied) {
-    runtime.targetForceProgress = isApplied ? 1 : 0;
-
-    if (!runtime.animationFrameId) {
-        runtime.lastTimestamp = 0;
-        runtime.animationFrameId = window.requestAnimationFrame(stepForceAnimation);
-    }
+function handleDurationChange() {
+    runtime.durationSeconds = clampDuration(durationInput?.value);
+    resetRuntime(true);
+    syncDurationInput();
+    refresh(false);
 }
 
-function stopForceAnimation(resetProgress = false) {
-    if (runtime.animationFrameId) {
-        window.cancelAnimationFrame(runtime.animationFrameId);
-        runtime.animationFrameId = null;
+function setForceApplied(isApplied) {
+    if (!isApplied) {
+        resetRuntime(true);
+        refresh(false);
+        return;
     }
 
+    resetRuntime(true);
+    runtime.isRunning = true;
     runtime.lastTimestamp = 0;
-    runtime.targetForceProgress = 0;
-
-    if (resetProgress) {
-        runtime.forceProgress = 0;
-    }
+    runtime.graphHistory = [{ time: 0, inputForce: 0, outputForce: 0 }];
+    refresh(false);
+    runtime.animationFrameId = window.requestAnimationFrame(stepForceAnimation);
 }
 
 function stepForceAnimation(timestamp) {
+    if (!runtime.isRunning) {
+        return;
+    }
+
     if (!runtime.lastTimestamp) {
         runtime.lastTimestamp = timestamp;
     }
 
     const delta = Math.min((timestamp - runtime.lastTimestamp) / 1000, 0.05);
     runtime.lastTimestamp = timestamp;
+    runtime.elapsedSeconds = Math.min(runtime.elapsedSeconds + delta, runtime.durationSeconds);
 
-    const responseRate = 4.8 / Math.max(state.mass || 1.2, 0.35);
-    const dampingFactor = Math.max(0.18, 1 - (state.damping || 0.35) * 0.32);
-    const deltaProgress = (runtime.targetForceProgress - runtime.forceProgress) * Math.min(1, delta * responseRate * dampingFactor);
-    runtime.forceProgress = Math.min(1, Math.max(0, runtime.forceProgress + deltaProgress));
-
+    const normalizedTime = runtime.durationSeconds > 0 ? runtime.elapsedSeconds / runtime.durationSeconds : 0;
+    runtime.forceProgress = pulseProfile(normalizedTime);
+    pushGraphSample();
     refresh(false);
 
-    if (Math.abs(runtime.targetForceProgress - runtime.forceProgress) < 0.0025) {
-        runtime.forceProgress = runtime.targetForceProgress;
-        runtime.animationFrameId = null;
+    if (runtime.elapsedSeconds >= runtime.durationSeconds) {
+        runtime.isRunning = false;
+        runtime.forceProgress = 0;
         runtime.lastTimestamp = 0;
+        pushGraphSample(runtime.durationSeconds, 0, 0);
+        runtime.animationFrameId = null;
         refresh(false);
         return;
     }
 
     runtime.animationFrameId = window.requestAnimationFrame(stepForceAnimation);
+}
+
+function pulseProfile(normalizedTime) {
+    const t = Math.min(1, Math.max(0, normalizedTime));
+    if (t <= 0.25) {
+        return smoothStep(t / 0.25);
+    }
+    if (t <= 0.75) {
+        return 1;
+    }
+    return 1 - smoothStep((t - 0.75) / 0.25);
+}
+
+function smoothStep(value) {
+    const t = Math.min(1, Math.max(0, value));
+    return t * t * (3 - 2 * t);
+}
+
+function pushGraphSample(time = runtime.elapsedSeconds, inputForce, outputForce) {
+    const currentInput = inputForce ?? state.inputForce * runtime.forceProgress;
+    const currentOutput = outputForce ?? currentInput * (state.d1 / state.d2);
+    const lastSample = runtime.graphHistory[runtime.graphHistory.length - 1];
+
+    if (lastSample && Math.abs(lastSample.time - time) < 0.0001) {
+        lastSample.inputForce = currentInput;
+        lastSample.outputForce = currentOutput;
+        return;
+    }
+
+    runtime.graphHistory.push({
+        time,
+        inputForce: currentInput,
+        outputForce: currentOutput,
+    });
+}
+
+function resetRuntime(clearGraph = false) {
+    if (runtime.animationFrameId) {
+        window.cancelAnimationFrame(runtime.animationFrameId);
+        runtime.animationFrameId = null;
+    }
+
+    runtime.forceProgress = 0;
+    runtime.elapsedSeconds = 0;
+    runtime.isRunning = false;
+    runtime.lastTimestamp = 0;
+
+    if (clearGraph) {
+        runtime.graphHistory = [];
+    }
+}
+
+function syncDurationInput() {
+    runtime.durationSeconds = clampDuration(durationInput?.value ?? runtime.durationSeconds);
+    if (durationInput) {
+        durationInput.value = runtime.durationSeconds.toFixed(1);
+    }
+}
+
+function clampDuration(value) {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) {
+        return DEFAULT_DURATION_SECONDS;
+    }
+
+    return Math.min(10, Math.max(0.8, parsed));
 }
 
 async function initializeScene() {

@@ -123,44 +123,50 @@ export function updateDashboard(simulation) {
     metricElement("metric-d2").textContent = `${inputs.d2.toFixed(2)} cm`;
     metricElement("metric-torque-input").textContent = `${moments.torqueInput.toFixed(1)} N*cm`;
     metricElement("metric-torque-output").textContent = `${moments.torqueOutput.toFixed(1)} N*cm`;
-    metricElement("metric-mechanical-advantage").textContent = `${actual.mechanicalAdvantage.toFixed(2)}x`;
+    metricElement("metric-mechanical-advantage").textContent = `${ideal.mechanicalAdvantage.toFixed(2)}x`;
     metricElement("metric-jaw-gap").textContent = `${scene.jawGap.toFixed(2)} cm`;
 
     metricElement("status-equilibrium").textContent = status.equilibriumLabel;
     metricElement("status-advantage").textContent = status.advantageLabel;
-    metricElement("status-efficiency").textContent = `${(actual.efficiency * 100).toFixed(1)} %`;
+    metricElement("status-efficiency").textContent = `${actual.reactionForce.toFixed(1)} N`;
     metricElement("status-observation").textContent = status.systemObservation;
 
     setTone(metricElement("status-equilibrium").closest(".status-card"), status.equilibriumTone);
-    setTone(metricElement("status-advantage").closest(".status-card"), actual.mechanicalAdvantage >= 1.8 ? "good" : "warn");
-    setTone(metricElement("status-efficiency").closest(".status-card"), actual.efficiency >= 0.82 ? "good" : actual.efficiency >= 0.68 ? "warn" : "alert");
-    setTone(metricElement("status-observation").closest(".status-card"), status.equilibriumTone);
+    setTone(metricElement("status-advantage").closest(".status-card"), ideal.mechanicalAdvantage >= 1.8 ? "good" : "warn");
+    setTone(metricElement("status-efficiency").closest(".status-card"), load.isApplied ? "good" : "warn");
+    setTone(metricElement("status-observation").closest(".status-card"), load.isApplied ? "good" : "warn");
 
     metricElement("badge-ma").textContent = `${ideal.mechanicalAdvantage.toFixed(2)}x`;
-    metricElement("badge-efficiency").textContent = `${(actual.efficiency * 100).toFixed(1)}%`;
+    metricElement("badge-efficiency").textContent = `${actual.reactionForce.toFixed(1)} N`;
     metricElement("badge-gap").textContent = `${scene.jawGap.toFixed(2)} cm`;
     metricElement("badge-state").textContent = status.equilibriumLabel;
 
     metricElement("configured-force-chip").textContent = `Carga configurada: ${inputs.inputForce.toFixed(1)} N`;
-    metricElement("load-state-copy").textContent = load.isApplied
-        ? `La pinza está transmitiendo ${load.activeInputForce.toFixed(1)} N hacia el sistema y cerrando las mordazas según la geometría configurada.`
-        : `La pinza está en reposo. Ajusta la fuerza de entrada y pulsa Aplicar fuerza para ver la transmisión mecánica.`;
+    metricElement("force-duration-readout").textContent = `${load.durationSeconds.toFixed(1)} s`;
+    metricElement("load-state-copy").textContent = load.isRunning
+        ? `La fuerza se está aplicando de forma progresiva. Tiempo transcurrido: ${load.elapsedSeconds.toFixed(2)} s de ${load.durationSeconds.toFixed(1)} s; entrada ${load.activeInputForce.toFixed(1)} N y salida ${actual.outputForce.toFixed(1)} N.`
+        : load.stateLabel === "Evento completado"
+            ? `El evento ya terminó. La gráfica conserva el historial temporal de entrada y salida para que puedas analizar la respuesta antes de lanzar otro ensayo.`
+            : `La pinza está en reposo. Ajusta la fuerza de entrada, define el tiempo de aplicación y pulsa Aplicar fuerza para registrar el evento.`;
 
     metricElement("graph-configured-input").textContent = `${inputs.inputForce.toFixed(1)} N`;
     metricElement("graph-active-input").textContent = `${load.activeInputForce.toFixed(1)} N`;
     metricElement("graph-active-output").textContent = `${actual.outputForce.toFixed(1)} N`;
+    metricElement("graph-duration").textContent = `${load.durationSeconds.toFixed(1)} s`;
     metricElement("graph-configured-output").textContent = `${potential.outputForce.toFixed(1)} N`;
-    metricElement("graph-caption").textContent = load.isApplied
-        ? `El punto operativo se desplaza sobre la curva naranja mientras la carga sube hasta ${load.activeInputForce.toFixed(1)} N. La línea azul marca la referencia 1:1 de entrada.`
-        : `La gráfica muestra la respuesta configurada de la pinza para una carga máxima de ${inputs.inputForce.toFixed(1)} N. Al aplicar fuerza, el punto rojo avanzará desde el origen hasta el punto de trabajo.`;
+    metricElement("graph-caption").textContent = load.isRunning
+        ? `La gráfica temporal registra cuadro a cuadro cómo suben y bajan la fuerza de entrada y la fuerza de salida durante el evento.`
+        : load.stateLabel === "Evento completado"
+            ? `La gráfica conserva el evento completo de ${load.durationSeconds.toFixed(1)} s. El punto rojo queda en el último instante registrado y puedes reiniciar o lanzar una nueva aplicación.`
+            : `La gráfica quedará afectada durante ${load.durationSeconds.toFixed(1)} s cuando pulses Aplicar fuerza, registrando la evolución temporal del evento.`;
 
     const applyButton = metricElement("apply-force-button");
     const releaseButton = metricElement("release-force-button");
     if (applyButton) {
-        applyButton.disabled = load.progress > 0.985;
+        applyButton.disabled = load.isRunning;
     }
     if (releaseButton) {
-        releaseButton.disabled = load.progress < 0.015;
+        releaseButton.disabled = !load.isRunning && load.elapsedSeconds < 0.001 && !load.isApplied;
     }
 
     metricElement("equation-live").textContent = texts.equation;

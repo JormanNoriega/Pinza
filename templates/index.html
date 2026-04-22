@@ -107,8 +107,8 @@
                         <strong id="status-advantage">-</strong>
                     </article>
                     <article class="status-card tone-good">
-                        <span>Eficiencia estimada</span>
-                        <strong id="status-efficiency">-</strong>
+                        <span>Reacción en el fulcro</span>
+                        <strong id="status-efficiency">0 N</strong>
                     </article>
                     <article class="status-card tone-good">
                         <span>Observación técnica</span>
@@ -133,8 +133,15 @@
                             <p id="load-state-copy">La pinza espera una orden de carga para empezar a transmitir fuerza.</p>
                         </div>
                         <div class="hero-action-buttons">
+                            <label class="duration-control" for="force-duration-input">
+                                <span>Tiempo de aplicación</span>
+                                <div class="duration-input-row">
+                                    <input id="force-duration-input" type="number" min="0.8" max="10" step="0.1" value="2.4">
+                                    <small id="force-duration-readout">2.4 s</small>
+                                </div>
+                            </label>
                             <button id="apply-force-button" class="primary-button" type="button">Aplicar fuerza</button>
-                            <button id="release-force-button" class="soft-button" type="button">Liberar</button>
+                            <button id="release-force-button" class="soft-button" type="button">Reiniciar</button>
                         </div>
                     </div>
                 </div>
@@ -144,8 +151,8 @@
                         <strong id="badge-ma">0x</strong>
                     </article>
                     <article class="hero-badge">
-                        <span>Eficiencia</span>
-                        <strong id="badge-efficiency">0%</strong>
+                        <span>Reacción R</span>
+                        <strong id="badge-efficiency">0 N</strong>
                     </article>
                     <article class="hero-badge">
                         <span>Apertura</span>
@@ -205,6 +212,11 @@
                         <small>Respuesta efectiva instantánea en las mordazas.</small>
                     </article>
                     <article class="graph-stat">
+                        <span>Duración</span>
+                        <strong id="graph-duration">0 s</strong>
+                        <small>Tiempo total del evento de carga representado en la gráfica.</small>
+                    </article>
+                    <article class="graph-stat">
                         <span>Salida máxima</span>
                         <strong id="graph-configured-output">0 N</strong>
                         <small>Fuerza esperada al aplicar el 100% de la carga configurada.</small>
@@ -243,8 +255,8 @@
                             <strong class="formula-symbol">VM = F_salida / F_entrada = d1 / d2</strong>
                         </div>
                         <div class="formula-card">
-                            <span class="formula-label">Modelo extendido para pérdidas</span>
-                            <strong class="formula-symbol">F_salida,real = (F_entrada * d1 / d2) * eta</strong>
+                            <span class="formula-label">Equilibrio vertical en el apoyo</span>
+                            <strong class="formula-symbol">ΣFy = 0 => R = F_entrada + F_salida</strong>
                         </div>
                     </div>
 
@@ -254,8 +266,8 @@
                             genera un momento sobre el pivote y ese momento se transmite a las mordazas.
                         </p>
                         <p>
-                            Para que la experiencia sea educativa y ampliable, el cálculo distingue entre el caso ideal
-                            de equilibrio perfecto y un caso efectivo con pérdidas por fricción, amortiguamiento y flexibilidad.
+                            Para mantener el modelo sencillo, la simulación usa una formulación estática ideal:
+                            una sola rotación alrededor del fulcro y equilibrio exacto de momentos.
                         </p>
                         <p id="equation-live" class="live-copy"></p>
                         <p id="geometry-live" class="live-copy"></p>

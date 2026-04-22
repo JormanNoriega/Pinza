@@ -158,6 +158,39 @@ input {
     align-items: center;
 }
 
+.duration-control {
+    display: grid;
+    gap: 0.35rem;
+    padding: 0.78rem 0.9rem;
+    border-radius: 16px;
+    border: 1px solid var(--line);
+    background: rgba(255, 255, 255, 0.84);
+    min-width: 200px;
+}
+
+.duration-control span {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.duration-input-row {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+}
+
+.duration-input-row input {
+    max-width: 92px;
+}
+
+.duration-input-row small {
+    color: var(--ink);
+    font-weight: 700;
+}
+
 .hero-badges {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -506,7 +539,7 @@ input[type="range"]:focus-visible {
 
 .graph-overview {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 0.75rem;
 }
 
