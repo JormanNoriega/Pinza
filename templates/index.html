@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Pinza 3D | Laboratorio virtual de palancas</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.163.0/build/three.module.js",
+                "three/examples/jsm/": "https://unpkg.com/three@0.163.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+    <div class="app-shell">
+        <aside class="sidebar">
+            <section class="panel intro-panel">
+                <p class="eyebrow">Laboratorio virtual de mecánica</p>
+                <h1>Pinza tipo alicate como palanca de primer grado</h1>
+                <p class="lede">
+                    Explora cómo la geometría del alicate transforma la fuerza aplicada en los mangos en fuerza útil
+                    sobre las mordazas. La escena 3D, el modelo matemático y los resultados numéricos se actualizan al instante.
+                </p>
+                <div class="legend-row">
+                    <span class="legend-chip">Flask</span>
+                    <span class="legend-chip">Three.js</span>
+                    <span class="legend-chip">Modelo de palanca</span>
+                    <span class="legend-chip">Actualización en tiempo real</span>
+                </div>
+            </section>
+
+            <section class="panel">
+                <div class="panel-head">
+                    <div>
+                        <p class="section-kicker">Panel de control</p>
+                        <h2>Parámetros del modelo</h2>
+                    </div>
+                    <button id="reset-button" class="ghost-button" type="button">Restablecer</button>
+                </div>
+                <div id="controls-root" class="controls-root"></div>
+            </section>
+
+            <section class="panel results-panel">
+                <div class="panel-head">
+                    <div>
+                        <p class="section-kicker">Panel de resultados</p>
+                        <h2>Magnitudes en tiempo real</h2>
+                    </div>
+                </div>
+
+                <div class="metrics-grid">
+                    <article class="metric-card">
+                        <span>Fuerza de entrada</span>
+                        <strong id="metric-input-force">0 N</strong>
+                        <small>Carga aplicada en los mangos</small>
+                    </article>
+                    <article class="metric-card">
+                        <span>Fuerza de salida</span>
+                        <strong id="metric-output-force">0 N</strong>
+                        <small>Fuerza efectiva en mordazas</small>
+                    </article>
+                    <article class="metric-card">
+                        <span>Distancia d1</span>
+                        <strong id="metric-d1">0 cm</strong>
+                        <small>Entrada respecto al fulcro</small>
+                    </article>
+                    <article class="metric-card">
+                        <span>Distancia d2</span>
+                        <strong id="metric-d2">0 cm</strong>
+                        <small>Salida respecto al fulcro</small>
+                    </article>
+                    <article class="metric-card">
+                        <span>Torque de entrada</span>
+                        <strong id="metric-torque-input">0 N*cm</strong>
+                        <small>Momento en el pivote</small>
+                    </article>
+                    <article class="metric-card">
+                        <span>Torque de salida</span>
+                        <strong id="metric-torque-output">0 N*cm</strong>
+                        <small>Momento transmitido a mordazas</small>
+                    </article>
+                    <article class="metric-card">
+                        <span>Ventaja mecánica</span>
+                        <strong id="metric-mechanical-advantage">0x</strong>
+                        <small>Relación salida / entrada</small>
+                    </article>
+                    <article class="metric-card">
+                        <span>Apertura de mordaza</span>
+                        <strong id="metric-jaw-gap">0 cm</strong>
+                        <small>Separación visible entre puntas</small>
+                    </article>
+                </div>
+
+                <div class="status-strip">
+                    <article class="status-card tone-good">
+                        <span>Estado del sistema</span>
+                        <strong id="status-equilibrium">-</strong>
+                    </article>
+                    <article class="status-card tone-good">
+                        <span>Nivel de ventaja</span>
+                        <strong id="status-advantage">-</strong>
+                    </article>
+                    <article class="status-card tone-good">
+                        <span>Eficiencia estimada</span>
+                        <strong id="status-efficiency">-</strong>
+                    </article>
+                    <article class="status-card tone-good">
+                        <span>Observación técnica</span>
+                        <strong id="status-observation">-</strong>
+                    </article>
+                </div>
+            </section>
+        </aside>
+
+        <main class="workspace">
+            <section class="panel hero-panel">
+                <div class="hero-copy">
+                    <p class="section-kicker">Simulación conectada</p>
+                    <h2>Geometría, fuerza y movimiento en una sola experiencia</h2>
+                    <p>
+                        El modelo 3D no es decorativo: la apertura, la posición de las flechas de fuerza, el fulcro
+                        y los marcadores de distancia responden a los mismos parámetros que alimentan el cálculo mecánico.
+                    </p>
+                    <div class="hero-actions">
+                        <div class="hero-action-copy">
+                            <span class="legend-chip" id="configured-force-chip">Carga configurada: 0 N</span>
+                            <p id="load-state-copy">La pinza espera una orden de carga para empezar a transmitir fuerza.</p>
+                        </div>
+                        <div class="hero-action-buttons">
+                            <button id="apply-force-button" class="primary-button" type="button">Aplicar fuerza</button>
+                            <button id="release-force-button" class="soft-button" type="button">Liberar</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="hero-badges">
+                    <article class="hero-badge">
+                        <span>VM ideal</span>
+                        <strong id="badge-ma">0x</strong>
+                    </article>
+                    <article class="hero-badge">
+                        <span>Eficiencia</span>
+                        <strong id="badge-efficiency">0%</strong>
+                    </article>
+                    <article class="hero-badge">
+                        <span>Apertura</span>
+                        <strong id="badge-gap">0 cm</strong>
+                    </article>
+                    <article class="hero-badge">
+                        <span>Estado</span>
+                        <strong id="badge-state">-</strong>
+                    </article>
+                </div>
+            </section>
+
+            <section class="panel scene-panel">
+                <div class="scene-header">
+                    <div>
+                        <p class="section-kicker">Vista 3D principal</p>
+                        <h2>Modelo interactivo de la pinza</h2>
+                    </div>
+                    <div class="scene-actions">
+                        <button id="toggle-axes-button" class="soft-button" type="button">Alternar ejes</button>
+                        <button id="focus-button" class="soft-button" type="button">Recentrar cámara</button>
+                    </div>
+                </div>
+
+                <div class="scene-info">
+                    <span class="scene-tag input-tag">Flechas de entrada</span>
+                    <span class="scene-tag output-tag">Flechas de salida</span>
+                    <span class="scene-tag fulcrum-tag">Fulcro</span>
+                    <span class="scene-tag measure-tag">Marcadores d1 / d2</span>
+                </div>
+
+                <div id="three-container" class="scene-canvas" aria-label="Escena 3D de la pinza"></div>
+            </section>
+
+            <section class="panel graph-panel">
+                <div class="panel-head">
+                    <div>
+                        <p class="section-kicker">Gráfica de fuerzas</p>
+                        <h2>Entrada aplicada vs salida en mordazas</h2>
+                    </div>
+                </div>
+
+                <div class="graph-overview">
+                    <article class="graph-stat">
+                        <span>Carga seleccionada</span>
+                        <strong id="graph-configured-input">0 N</strong>
+                        <small>Magnitud máxima lista para aplicar con el botón.</small>
+                    </article>
+                    <article class="graph-stat">
+                        <span>Punto activo</span>
+                        <strong id="graph-active-input">0 N</strong>
+                        <small>Fuerza de entrada que está pasando en este instante.</small>
+                    </article>
+                    <article class="graph-stat">
+                        <span>Salida actual</span>
+                        <strong id="graph-active-output">0 N</strong>
+                        <small>Respuesta efectiva instantánea en las mordazas.</small>
+                    </article>
+                    <article class="graph-stat">
+                        <span>Salida máxima</span>
+                        <strong id="graph-configured-output">0 N</strong>
+                        <small>Fuerza esperada al aplicar el 100% de la carga configurada.</small>
+                    </article>
+                </div>
+
+                <div class="graph-legend">
+                    <span class="graph-legend-item graph-legend-input">Referencia de entrada</span>
+                    <span class="graph-legend-item graph-legend-output">Curva de salida</span>
+                    <span class="graph-legend-item graph-legend-point">Punto operativo</span>
+                </div>
+
+                <div class="graph-shell">
+                    <svg id="force-graph" class="force-graph" viewBox="0 0 920 340" aria-label="Gráfica comparativa de fuerza de entrada y fuerza de salida"></svg>
+                </div>
+
+                <p id="graph-caption" class="graph-caption"></p>
+            </section>
+
+            <section class="content-grid">
+                <article class="panel theory-panel">
+                    <div class="panel-head">
+                        <div>
+                            <p class="section-kicker">Modelo matemático</p>
+                            <h2>Palanca de primer grado</h2>
+                        </div>
+                    </div>
+
+                    <div class="formula-stack">
+                        <div class="formula-card">
+                            <span class="formula-label">Equilibrio ideal de momentos</span>
+                            <strong class="formula-symbol">F_entrada * d1 = F_salida * d2</strong>
+                        </div>
+                        <div class="formula-card">
+                            <span class="formula-label">Ventaja mecánica usada en la app</span>
+                            <strong class="formula-symbol">VM = F_salida / F_entrada = d1 / d2</strong>
+                        </div>
+                        <div class="formula-card">
+                            <span class="formula-label">Modelo extendido para pérdidas</span>
+                            <strong class="formula-symbol">F_salida,real = (F_entrada * d1 / d2) * eta</strong>
+                        </div>
+                    </div>
+
+                    <div class="explanation-copy">
+                        <p>
+                            La pinza se representa como dos brazos rígidos articulados en un fulcro central. Cada mango
+                            genera un momento sobre el pivote y ese momento se transmite a las mordazas.
+                        </p>
+                        <p>
+                            Para que la experiencia sea educativa y ampliable, el cálculo distingue entre el caso ideal
+                            de equilibrio perfecto y un caso efectivo con pérdidas por fricción, amortiguamiento y flexibilidad.
+                        </p>
+                        <p id="equation-live" class="live-copy"></p>
+                        <p id="geometry-live" class="live-copy"></p>
+                    </div>
+                </article>
+
+                <article class="panel notes-panel">
+                    <div class="panel-head">
+                        <div>
+                            <p class="section-kicker">Diagnóstico y extensibilidad</p>
+                            <h2>Lectura del comportamiento</h2>
+                        </div>
+                    </div>
+
+                    <ul id="observations-list" class="observations-list"></ul>
+
+                    <div class="future-grid">
+                        <article class="future-card">
+                            <span>Siguiente capa</span>
+                            <strong>Contacto con objetos</strong>
+                            <p>La estructura está lista para añadir una fuerza de reacción cuando las mordazas toquen una pieza.</p>
+                        </article>
+                        <article class="future-card">
+                            <span>Siguiente capa</span>
+                            <strong>Rigidez y deformación</strong>
+                            <p>La app ya separa pérdidas y transmisión, así que puede incorporar flexión del material sin rehacer la base.</p>
+                        </article>
+                        <article class="future-card">
+                            <span>Siguiente capa</span>
+                            <strong>Análisis dinámico</strong>
+                            <p>Los parámetros de masa y amortiguamiento ya afectan la respuesta visual y se pueden escalar a un modelo temporal.</p>
+                        </article>
+                    </div>
+                </article>
+            </section>
+        </main>
+    </div>
+
+    <script id="app-defaults" type="application/json">{{ defaults | tojson }}</script>
+    <script type="module" src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
