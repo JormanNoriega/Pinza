@@ -47,6 +47,27 @@ function createJawSegment(length, thickness, depth, sign, material) {
     return group;
 }
 
+function configureArrowHelper(arrow) {
+    arrow.line.material.transparent = true;
+    arrow.line.material.opacity = 0.45;
+    arrow.line.material.depthTest = false;
+    arrow.line.material.depthWrite = false;
+    arrow.line.material.toneMapped = false;
+    arrow.line.renderOrder = 12;
+
+    arrow.cone.material.transparent = true;
+    arrow.cone.material.opacity = 0.45;
+    arrow.cone.material.depthTest = false;
+    arrow.cone.material.depthWrite = false;
+    arrow.cone.material.toneMapped = false;
+    arrow.cone.renderOrder = 12;
+}
+
+function setArrowOpacity(arrow, opacity) {
+    arrow.line.material.opacity = opacity;
+    arrow.cone.material.opacity = opacity;
+}
+
 export class PliersScene {
     constructor(container) {
         this.container = container;
@@ -267,6 +288,8 @@ export class PliersScene {
                 0.14,
             );
 
+            configureArrowHelper(inputArrow);
+            configureArrowHelper(outputArrow);
             annotationGroup.add(inputArrow, outputArrow);
 
             if (sign > 0) {
@@ -313,6 +336,7 @@ export class PliersScene {
         const scale = inputs.visualScale;
         const d1 = inputs.d1 * scale;
         const d2 = inputs.d2 * scale;
+        const annotationDepth = 0.24 * scale;
 
         const updateArrowPair = (inputArrow, outputArrow, sign) => {
             if (!inputArrow || !outputArrow) {
@@ -322,20 +346,22 @@ export class PliersScene {
             const hasInputForce = forces.actualForce > 0.01;
             const hasOutputForce = forces.outputForce > 0.01;
 
-            inputArrow.visible = hasInputForce;
-            outputArrow.visible = hasOutputForce;
+            inputArrow.visible = true;
+            outputArrow.visible = true;
 
-            if (hasInputForce) {
-                const inputLength = THREE.MathUtils.clamp(0.55 + forces.actualForce / 220, 0.55, 3.4);
-                inputArrow.position.set(-d1, sign * 1.12 * scale, 0);
-                inputArrow.setLength(inputLength, 0.24, 0.14);
-            }
+            const inputLength = hasInputForce
+                ? THREE.MathUtils.clamp(0.8 + forces.actualForce / 220, 0.8, 3.6)
+                : 0.95;
+            inputArrow.position.set(-d1, sign * 0.88 * scale, annotationDepth);
+            inputArrow.setLength(inputLength, 0.28, 0.18);
+            setArrowOpacity(inputArrow, hasInputForce ? 0.98 : 0.58);
 
-            if (hasOutputForce) {
-                const outputLength = THREE.MathUtils.clamp(0.6 + forces.outputForce / 280, 0.6, 4.8);
-                outputArrow.position.set(d2, sign * 0.72 * scale, 0);
-                outputArrow.setLength(outputLength, 0.24, 0.14);
-            }
+            const outputLength = hasOutputForce
+                ? THREE.MathUtils.clamp(0.7 + forces.outputForce / 280, 0.7, 4.8)
+                : 0.85;
+            outputArrow.position.set(d2, sign * 0.28 * scale, annotationDepth);
+            outputArrow.setLength(outputLength, 0.26, 0.16);
+            setArrowOpacity(outputArrow, hasOutputForce ? 0.98 : 0.52);
         };
 
         updateArrowPair(this.upperInputArrow, this.upperOutputArrow, 1);
