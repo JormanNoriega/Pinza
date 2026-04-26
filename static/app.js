@@ -59,7 +59,22 @@ refresh(true);
 initializeScene();
 
 function handleParameterChange(key, value) {
-    state = { ...state, [key]: value };
+    if (key === "handleLength") {
+        state = {
+            ...state,
+            handleLength: value,
+            handleLengthBase: value - (Number(state.pivotOffset) || 0),
+        };
+    } else if (key === "jawLength") {
+        state = {
+            ...state,
+            jawLength: value,
+            jawLengthBase: value + (Number(state.pivotOffset) || 0),
+        };
+    } else {
+        state = { ...state, [key]: value };
+    }
+
     resetRuntime(true);
     refresh(true);
 }

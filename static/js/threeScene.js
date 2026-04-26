@@ -187,12 +187,12 @@ export class PliersScene {
             roughness: 0.28,
         });
 
-        const pivotRing = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.38, 48), pivotMaterial);
-        pivotRing.rotation.x = Math.PI / 2;
-        pivotRing.castShadow = true;
-        pivotRing.receiveShadow = true;
+        this.pivotRing = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.38, 48), pivotMaterial);
+        this.pivotRing.rotation.x = Math.PI / 2;
+        this.pivotRing.castShadow = true;
+        this.pivotRing.receiveShadow = true;
 
-        const pivotCore = new THREE.Mesh(
+        this.pivotCore = new THREE.Mesh(
             new THREE.CylinderGeometry(0.18, 0.18, 0.52, 40),
             new THREE.MeshStandardMaterial({
                 color: 0xd0d8da,
@@ -200,14 +200,28 @@ export class PliersScene {
                 roughness: 0.18,
             }),
         );
-        pivotCore.rotation.x = Math.PI / 2;
-        pivotCore.castShadow = true;
-        pivotCore.receiveShadow = true;
+        this.pivotCore.rotation.x = Math.PI / 2;
+        this.pivotCore.castShadow = true;
+        this.pivotCore.receiveShadow = true;
 
-        this.machineRoot.add(pivotRing, pivotCore);
+        this.machineRoot.add(this.pivotRing, this.pivotCore);
     }
 
-    rebuildLevers(inputs) {
+    updatePivotPosition(geometry, scale) {
+        const pivotShift = geometry.pivotOffset * scale;
+        this.upperPivot.position.x = pivotShift;
+        this.lowerPivot.position.x = pivotShift;
+
+        if (this.pivotRing) {
+            this.pivotRing.position.x = pivotShift;
+        }
+
+        if (this.pivotCore) {
+            this.pivotCore.position.x = pivotShift;
+        }
+    }
+
+    rebuildLevers(inputs, geometry) {
         disposeGroup(this.upperGeometry);
         disposeGroup(this.lowerGeometry);
         disposeGroup(this.upperAnnotations);
@@ -218,13 +232,15 @@ export class PliersScene {
         this.lowerAnnotations.clear();
 
         const scale = inputs.visualScale;
-        const handleLength = inputs.handleLength * scale;
-        const jawLength = inputs.jawLength * scale;
+        const handleLength = geometry.handleLength * scale;
+        const jawLength = geometry.jawLength * scale;
         const handleThickness = 0.48 * scale;
         const handleDepth = 0.44 * scale;
         const gripLength = handleLength * 0.56;
         const jawThickness = 0.24 * scale;
         const jawDepth = 0.34 * scale;
+
+        this.updatePivotPosition(geometry, scale);
 
         const metalMaterial = new THREE.MeshStandardMaterial({
             color: 0x96a9af,
@@ -382,15 +398,21 @@ export class PliersScene {
     }
 
     update(simulation) {
-        const { inputs, load, actual, scene } = simulation;
+        const { inputs, geometry, load, actual, scene } = simulation;
         this.currentInputs = inputs;
 
-        const signature = [inputs.handleLength, inputs.jawLength, inputs.visualScale].map((value) => value.toFixed(3)).join("|");
+        const signature = [
+            inputs.handleLength,
+            inputs.jawLength,
+            geometry.pivotOffset,
+            inputs.visualScale,
+        ].map((value) => value.toFixed(3)).join("|");
         if (signature !== this.geometrySignature) {
-            this.rebuildLevers(inputs);
+            this.rebuildLevers(inputs, geometry);
             this.geometrySignature = signature;
         }
 
+        this.updatePivotPosition(geometry, inputs.visualScale);
         this.updateAnnotations(inputs, {
             actualForce: load.activeInputForce,
             outputForce: actual.outputForce,

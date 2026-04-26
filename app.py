@@ -16,6 +16,9 @@ DEFAULT_PARAMETERS: dict[str, float] = {
     "angleLimit": 32.0,
     "handleLength": 7.4,
     "jawLength": 2.6,
+    "handleLengthBase": 7.4,
+    "jawLengthBase": 2.6,
+    "pivotOffset": 0.0,
     "visualScale": 1.0,
     "friction": 0.08,
     "rigidity": 90.0,
@@ -49,6 +52,34 @@ def to_float(value: Any, fallback: float) -> float:
         return fallback
 
 
+def pivot_offset_bounds(handle_length: float, jaw_length: float) -> tuple[float, float]:
+    return (
+        max(RANGES["handleLength"][0] - handle_length, jaw_length - RANGES["jawLength"][1]),
+        min(RANGES["handleLength"][1] - handle_length, jaw_length - RANGES["jawLength"][0]),
+    )
+
+
+def get_base_lengths(params: dict[str, Any]) -> tuple[float, float]:
+    return (
+        clamp(to_float(params.get("handleLengthBase"), params.get("handleLength", DEFAULT_PARAMETERS["handleLength"])), *RANGES["handleLength"]),
+        clamp(to_float(params.get("jawLengthBase"), params.get("jawLength", DEFAULT_PARAMETERS["jawLength"])), *RANGES["jawLength"]),
+    )
+
+
+def resolve_geometry(params: dict[str, float]) -> dict[str, float]:
+    handle_length_base, jaw_length_base = get_base_lengths(params)
+    lower, upper = pivot_offset_bounds(handle_length_base, jaw_length_base)
+    pivot_offset = clamp(to_float(params.get("pivotOffset"), DEFAULT_PARAMETERS["pivotOffset"]), lower, upper)
+    return {
+        "handleLengthBase": handle_length_base,
+        "jawLengthBase": jaw_length_base,
+        "pivotOffset": pivot_offset,
+        "handleLength": handle_length_base + pivot_offset,
+        "jawLength": jaw_length_base - pivot_offset,
+        "totalLength": handle_length_base + jaw_length_base,
+    }
+
+
 def normalize_params(payload: dict[str, Any] | None = None) -> dict[str, float]:
     source = {**DEFAULT_PARAMETERS, **(payload or {})}
 
@@ -59,13 +90,20 @@ def normalize_params(payload: dict[str, Any] | None = None) -> dict[str, float]:
         for key, default in DEFAULT_PARAMETERS.items()
     }
 
-    params["d1"] = clamp(to_float(source.get("d1"), DEFAULT_PARAMETERS["d1"]), 1.5, params["handleLength"] - 0.45)
-    params["d2"] = clamp(to_float(source.get("d2"), DEFAULT_PARAMETERS["d2"]), 0.5, params["jawLength"] - 0.15)
+    geometry = resolve_geometry(params)
+    params["handleLength"] = geometry["handleLength"]
+    params["jawLength"] = geometry["jawLength"]
+    params["handleLengthBase"] = geometry["handleLengthBase"]
+    params["jawLengthBase"] = geometry["jawLengthBase"]
+    params["pivotOffset"] = geometry["pivotOffset"]
+    params["d1"] = clamp(to_float(source.get("d1"), DEFAULT_PARAMETERS["d1"]), 1.5, geometry["handleLength"] - 0.45)
+    params["d2"] = clamp(to_float(source.get("d2"), DEFAULT_PARAMETERS["d2"]), 0.5, geometry["jawLength"] - 0.15)
     return params
 
 
 def compute_simulation(payload: dict[str, Any] | None = None) -> dict[str, Any]:
     inputs = normalize_params(payload)
+    geometry = resolve_geometry(inputs)
 
     torque_input = inputs["inputForce"] * inputs["d1"]
     ideal_output_force = torque_input / inputs["d2"]
@@ -94,8 +132,8 @@ def compute_simulation(payload: dict[str, Any] | None = None) -> dict[str, Any]:
     residual_ratio = torque_loss / torque_input if torque_input else 0.0
     actual_mechanical_advantage = output_force / inputs["inputForce"] if inputs["inputForce"] else 0.0
 
-    jaw_gap = max(0.16, 2.0 * inputs["jawLength"] * sin(radians(effective_open_angle) / 2.0))
-    handle_span = max(0.24, 2.0 * inputs["handleLength"] * sin(radians(effective_open_angle) / 2.0))
+    jaw_gap = max(0.16, 2.0 * geometry["jawLength"] * sin(radians(effective_open_angle) / 2.0))
+    handle_span = max(0.24, 2.0 * geometry["handleLength"] * sin(radians(effective_open_angle) / 2.0))
 
     if limited_by_stop:
         equilibrium_label = "Limitado por tope angular"
@@ -130,6 +168,17 @@ def compute_simulation(payload: dict[str, Any] | None = None) -> dict[str, Any]:
             f"La apertura efectiva es de {jaw_gap:.2f} cm con un angulo operativo de {effective_open_angle:.1f} grados."
             if not limited_by_stop
             else f"El angulo solicitado supera el tope de {inputs['angleLimit']:.1f} grados y la pinza queda mecanicamente limitada."
+        ),
+        (
+            "El pivote permanece centrado y las longitudes efectivas coinciden con la geometria de referencia."
+            if abs(geometry["pivotOffset"]) < 0.01
+            else (
+                f"El pivote se desplazo {geometry['pivotOffset']:.2f} cm hacia las mordazas; "
+                f"el brazo util del mango queda en {geometry['handleLength']:.2f} cm y el de la mordaza en {geometry['jawLength']:.2f} cm."
+                if geometry["pivotOffset"] > 0
+                else f"El pivote se desplazo {abs(geometry['pivotOffset']):.2f} cm hacia los mangos; "
+                f"el brazo util del mango queda en {geometry['handleLength']:.2f} cm y el de la mordaza en {geometry['jawLength']:.2f} cm."
+            )
         ),
         (
             f"La eficiencia estimada es del {efficiency * 100.0:.1f}%; reducir friccion o aumentar rigidez acerca el sistema al equilibrio ideal."
@@ -169,7 +218,14 @@ def compute_simulation(payload: dict[str, Any] | None = None) -> dict[str, Any]:
             "effectiveOpenAngle": round(effective_open_angle, 4),
             "jawGap": round(jaw_gap, 4),
             "handleSpan": round(handle_span, 4),
+            "pivotOffset": round(geometry["pivotOffset"], 4),
             "limitedByStop": limited_by_stop,
+        },
+        "geometry": {
+            "pivotOffset": round(geometry["pivotOffset"], 4),
+            "handleLength": round(geometry["handleLength"], 4),
+            "jawLength": round(geometry["jawLength"], 4),
+            "totalLength": round(geometry["totalLength"], 4),
         },
         "status": {
             "equilibriumLabel": equilibrium_label,
@@ -184,7 +240,8 @@ def compute_simulation(payload: dict[str, Any] | None = None) -> dict[str, Any]:
             ),
             "geometry": (
                 f"VM ideal = d1 / d2 = {inputs['d1']:.2f} / {inputs['d2']:.2f} = {ideal_mechanical_advantage:.2f}x. "
-                f"La razon inversa d2 / d1 es {inverse_ratio:.2f}."
+                f"El pivote esta en {geometry['pivotOffset']:.2f} cm y deja {geometry['handleLength']:.2f} cm hacia el mango "
+                f"y {geometry['jawLength']:.2f} cm hacia la mordaza."
             ),
         },
         "observations": observations,
